@@ -1,0 +1,24 @@
+name: cleanup-lock-parts
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/bootstrap-foundation
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Remove parts and assemble workflow
+        run: |
+          set -euo pipefail
+          rm -rf web/package-lock.parts
+          rm -f .github/workflows/assemble-package-lock.yml
+          rm -f web/.lockfile-probe.txt web/.lockfile-probe2.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: remove temporary package-lock assemble parts"
+          git push
