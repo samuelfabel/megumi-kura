@@ -1,0 +1,45 @@
+# Binaries
+/bin/
+/dist/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+/api/megumi-kura
+/megumi-kura
+
+# Frontend
+web/node_modules/
+web/dist/
+web/.vite/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Go
+api/vendor/
+*.test
+coverage.out
+coverage.html
+
+# Logs and temp
+*.log
+tmp/
+.tmp/
+.cache/
+
+# Docker volumes
+deploy/docker/data/
