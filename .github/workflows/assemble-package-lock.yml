@@ -3,7 +3,6 @@ on:
   push:
     paths:
       - 'web/package-lock.parts/**'
-      - '.github/workflows/assemble-package-lock.yml'
     branches: [feat/bootstrap-foundation]
   workflow_dispatch:
 permissions:
@@ -19,7 +18,9 @@ jobs:
       - name: Assemble lockfile
         run: |
           set -euo pipefail
-          ls -la web/package-lock.parts/
+          count=$(ls web/package-lock.parts/part_*.txt | wc -l)
+          echo "parts=$count"
+          test "$count" -eq 123
           cat web/package-lock.parts/part_*.txt > web/package-lock.json
           wc -c web/package-lock.json
           test "$(wc -c < web/package-lock.json)" -eq 61278
