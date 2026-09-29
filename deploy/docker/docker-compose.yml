@@ -1,0 +1,34 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: megumi
+      POSTGRES_PASSWORD: megumi
+      POSTGRES_DB: megumi_kura
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U megumi -d megumi_kura"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    environment:
+      MK_HTTP_ADDR: ":8080"
+      MK_DATABASE_URL: postgres://megumi:megumi@db:5432/megumi_kura?sslmode=disable
+      MK_SESSION_SECRET: change-me-dev-only-secret
+      MK_STATIC_DIR: /app/web/dist
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
