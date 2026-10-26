@@ -40,7 +40,7 @@ make test
 
 ## Git branches
 
-Use conventional branch names — **do not** use a `cursor/` prefix:
+Use only these conventional branch prefixes:
 
 | Prefix | Use |
 | --- | --- |
@@ -52,7 +52,7 @@ Use conventional branch names — **do not** use a `cursor/` prefix:
 
 Examples: `feat/dashboard-promessa-publica`, `fix/stock-out-validation`.
 
-Do not add `Co-authored-by` (or equivalent) trailers to commits.
+Commit messages contain only a subject and a body describing the change; no extra trailers.
 
 ## GitHub workflow (public repository)
 
@@ -62,9 +62,6 @@ Prefer this loop on [megumi-kura](https://github.com/samuelfabel/megumi-kura):
 2. Create a branch from `main` using conventional prefixes (`feat/`, `fix/`, `docs/`, `chore/`)
 3. Open a **Pull Request** that references the issue (`Closes #N` or `Fixes #N`)
 4. Keep the PR focused; wait for review before merging
-
-Do **not** use a `cursor/` branch prefix.
-Do **not** add `Co-authored-by` trailers to commits.
 
 The `megumi-kura-spec` repository may hold planning notes; **application source of truth is `megumi-kura`**.
 
