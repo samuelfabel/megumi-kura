@@ -16,8 +16,8 @@ Application code lives in this repository (`megumi-kura`). Planning may happen e
 
 ## Public project rules
 
-- Branch names follow conventional prefixes (`feat/`, `fix/`, `docs/`, `chore/`). **Never** use a `cursor/` prefix.
-- Never add `Co-authored-by` (or equivalent) trailers to commits.
+- Branch names use only the conventional prefixes (`feat/`, `fix/`, `docs/`, `chore/`, `refactor/`).
+- Commit messages contain only a subject and a body describing the change; no extra trailers.
 - Do not put ADNIPO branding as a core dependency.
 - Project name is always ASCII: `Megumi Kura`.
 - Public promise registration (`POST /api/v1/public/promises`) is for donors; names stay off the public dashboard.
