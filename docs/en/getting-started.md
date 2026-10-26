@@ -10,6 +10,8 @@ basic baskets, and contribution promises.
 3. **Basket** — configurable composition; available count is computed
 4. **Promises** — future expectations; not real stock; filtered by date
 
+Public promises require [captcha](./captcha.md) on submit.
+
 ## Local setup
 
 ```bash

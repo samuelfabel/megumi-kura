@@ -7,19 +7,20 @@ import (
 )
 
 type Config struct {
-	HTTPAddr            string
-	DatabaseURL         string
-	SessionSecret       string
-	StaticDir           string
-	SiteName            string
-	SiteDescription     string
-	DefaultLocale       string
-	ThemePrimary        string
-	ThemeSecondary      string
-	ThemeAccent         string
-	AllowNegativeStock  bool
-	CookieSecure        bool
-	SessionHours        int
+	HTTPAddr           string
+	DatabaseURL        string
+	SessionSecret      string
+	StaticDir          string
+	SiteName           string
+	SiteDescription    string
+	DefaultLocale      string
+	ThemePrimary       string
+	ThemeSecondary     string
+	ThemeAccent        string
+	AllowNegativeStock bool
+	CookieSecure       bool
+	SessionHours       int
+	CaptchaTTLSeconds  int
 }
 
 func Load() Config {
@@ -37,6 +38,7 @@ func Load() Config {
 		AllowNegativeStock: getenvBool("MK_ALLOW_NEGATIVE_STOCK", false),
 		CookieSecure:       getenvBool("MK_COOKIE_SECURE", false),
 		SessionHours:       getenvInt("MK_SESSION_HOURS", 24),
+		CaptchaTTLSeconds:  getenvInt("MK_CAPTCHA_TTL_SECONDS", 600),
 	}
 }
 
