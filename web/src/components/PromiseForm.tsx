@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
+import { CaptchaField, type CaptchaValue } from "./CaptchaField";
 import { t } from "../i18n";
-import { ApiError, fetchCaptcha, type StockItem } from "../services/api";
+import {
+  ApiError,
+  createPublicPromiseBatch,
+  type Kit,
+  type StockItem,
+} from "../services/api";
 import {
   flushNextQueuedPromise,
   pendingPromiseCount,
@@ -8,8 +14,11 @@ import {
   watchOnline,
 } from "../services/promiseQueue";
 
+type Line = { food_id: number; quantity: string };
+
 type Props = {
   foods: StockItem[];
+  kits?: Kit[];
   onSubmitted: () => void;
 };
 
@@ -21,43 +30,33 @@ function todayISO() {
   return `${y}-${m}-${day}`;
 }
 
-export function PromiseForm({ foods, onSubmitted }: Props) {
-  const [foodId, setFoodId] = useState(0);
+export function PromiseForm({ foods, kits = [], onSubmitted }: Props) {
   const [person, setPerson] = useState("");
-  const [qty, setQty] = useState("");
   const [date, setDate] = useState(todayISO());
+  const [mode, setMode] = useState<"items" | "kit">("items");
+  const [kitId, setKitId] = useState(0);
+  const [lines, setLines] = useState<Line[]>([{ food_id: 0, quantity: "" }]);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<"sent" | "queued" | "flushed" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaQuestion, setCaptchaQuestion] = useState("");
-  const [captchaAnswer, setCaptchaAnswer] = useState("");
-
-  const refreshCaptcha = useCallback(async () => {
-    try {
-      const ch = await fetchCaptcha();
-      setCaptchaToken(ch.captcha_token);
-      setCaptchaQuestion(ch.question);
-      setCaptchaAnswer("");
-    } catch {
-      setCaptchaToken("");
-      setCaptchaQuestion("");
-      setError(t("promise.error_captcha_load"));
-    }
-  }, []);
+  const [captcha, setCaptcha] = useState<CaptchaValue | null>(null);
+  const [captchaReset, setCaptchaReset] = useState(0);
 
   useEffect(() => {
-    if (foods[0] && foodId === 0) setFoodId(foods[0].food_id);
-  }, [foods, foodId]);
+    if (foods[0] && lines[0]?.food_id === 0) {
+      setLines([{ food_id: foods[0].food_id, quantity: "" }]);
+    }
+  }, [foods, lines]);
+
+  useEffect(() => {
+    if (kits[0] && kitId === 0) setKitId(kits[0].id);
+  }, [kits, kitId]);
 
   useEffect(() => {
     setPending(pendingPromiseCount());
-    void refreshCaptcha();
     return watchOnline(() => setPending(pendingPromiseCount()));
-  }, [refreshCaptcha]);
-
-  const selected = foods.find((f) => f.food_id === foodId);
+  }, []);
 
   function mapCaptchaError(err: unknown): string {
     if (err instanceof ApiError) {
@@ -71,37 +70,81 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
     return t("promise.error_generic");
   }
 
+  function captchaReady(): boolean {
+    if (!captcha?.captcha_token) return false;
+    if (captcha.provider === "math") return Boolean(captcha.captcha_answer.trim());
+    return true;
+  }
+
+  function bumpCaptcha() {
+    setCaptcha(null);
+    setCaptchaReset((n) => n + 1);
+  }
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setFeedback(null);
-    if (!foodId || !person.trim() || !qty.trim() || !date) {
+    if (!person.trim() || !date) {
       setError(t("promise.error_required"));
       return;
     }
-    if (navigator.onLine && (!captchaToken || !captchaAnswer.trim())) {
+    if (navigator.onLine && !captchaReady()) {
       setError(t("promise.error_captcha_required"));
       return;
     }
+
+    const items =
+      mode === "kit"
+        ? []
+        : lines
+            .filter((l) => l.food_id && l.quantity.trim())
+            .map((l) => ({
+              food_id: l.food_id,
+              quantity: l.quantity.trim(),
+            }));
+    if (mode === "items" && items.length === 0) {
+      setError(t("promise.error_required"));
+      return;
+    }
+    if (mode === "kit" && !kitId) {
+      setError(t("promise.error_kit"));
+      return;
+    }
+
     setBusy(true);
     try {
-      const result = await submitPromiseOfflineFirst({
-        food_id: foodId,
-        person_name: person.trim(),
-        quantity: qty.trim(),
-        promise_date: date,
-        captcha_token: captchaToken,
-        captcha_answer: captchaAnswer.trim(),
-      });
-      setFeedback(result.status);
+      if (!navigator.onLine) {
+        if (items[0]) {
+          await submitPromiseOfflineFirst({
+            food_id: items[0].food_id,
+            person_name: person.trim(),
+            quantity: items[0].quantity,
+            promise_date: date,
+          });
+          setFeedback("queued");
+        } else {
+          setError(t("promise.error_offline_kit"));
+        }
+      } else {
+        await createPublicPromiseBatch({
+          person_name: person.trim(),
+          promise_date: date,
+          kit_id: mode === "kit" ? kitId : null,
+          items,
+          captcha_token: captcha!.captcha_token,
+          captcha_answer: captcha!.captcha_answer || "",
+        });
+        setFeedback("sent");
+        onSubmitted();
+      }
       setPending(pendingPromiseCount());
       setPerson("");
-      setQty("");
-      await refreshCaptcha();
-      if (result.status === "sent") onSubmitted();
+      setLines([{ food_id: foods[0]?.food_id ?? 0, quantity: "" }]);
+      bumpCaptcha();
     } catch (err) {
       setError(mapCaptchaError(err));
-      await refreshCaptcha();
+      bumpCaptcha();
     } finally {
       setBusy(false);
     }
@@ -110,29 +153,31 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
   async function onFlushPending() {
     setError(null);
     setFeedback(null);
-    if (!captchaToken || !captchaAnswer.trim()) {
+    if (!captchaReady()) {
       setError(t("promise.error_captcha_required"));
       return;
     }
     setBusy(true);
     try {
       const sent = await flushNextQueuedPromise({
-        captcha_token: captchaToken,
-        captcha_answer: captchaAnswer.trim(),
+        captcha_token: captcha!.captcha_token,
+        captcha_answer: captcha!.captcha_answer || "",
       });
       setPending(pendingPromiseCount());
-      await refreshCaptcha();
+      bumpCaptcha();
       if (sent) {
         setFeedback("flushed");
         onSubmitted();
       }
     } catch (err) {
       setError(mapCaptchaError(err));
-      await refreshCaptcha();
+      bumpCaptcha();
     } finally {
       setBusy(false);
     }
   }
+
+  const selectedKit = kits.find((k) => k.id === kitId);
 
   return (
     <section id="doar" className="section promise-section reveal" style={{ animationDelay: "200ms" }}>
@@ -152,73 +197,97 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
         </label>
 
         <label>
-          <span>{t("promise.food")}</span>
-          <select
-            value={foodId}
-            onChange={(e) => setFoodId(Number(e.target.value))}
-            required
-          >
-            {foods.map((f) => (
-              <option key={f.food_id} value={f.food_id}>
-                {f.name} ({f.unit})
-              </option>
-            ))}
-          </select>
+          <span>{t("promise.date")}</span>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
         </label>
 
-        <div className="promise-row">
-          <label>
-            <span>
-              {t("promise.quantity")}
-              {selected ? ` (${selected.unit})` : ""}
-            </span>
-            <input
-              inputMode="decimal"
-              value={qty}
-              onChange={(e) => setQty(e.target.value)}
-              placeholder="0"
-              required
-            />
-          </label>
-          <label>
-            <span>{t("promise.date")}</span>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              required
-            />
-          </label>
+        <div className="mode-row">
+          <button
+            type="button"
+            className={mode === "items" ? "btn-secondary active" : "btn-secondary"}
+            onClick={() => setMode("items")}
+          >
+            {t("promise.mode_items")}
+          </button>
+          <button
+            type="button"
+            className={mode === "kit" ? "btn-secondary active" : "btn-secondary"}
+            onClick={() => setMode("kit")}
+            disabled={kits.length === 0}
+          >
+            {t("promise.mode_kit")}
+          </button>
         </div>
 
-        <div className="captcha-row">
-          <label className="captcha-field">
-            <span>{t("promise.captcha")}</span>
-            <div className="captcha-input-row">
-              <span className="captcha-question" aria-live="polite">
-                {captchaQuestion ? `${captchaQuestion} =` : "…"}
-              </span>
-              <input
-                inputMode="numeric"
-                value={captchaAnswer}
-                onChange={(e) => setCaptchaAnswer(e.target.value)}
-                name="captcha_answer"
-                autoComplete="off"
-                required={typeof navigator !== "undefined" ? navigator.onLine : true}
-                aria-label={t("promise.captcha")}
-              />
-              <button
-                type="button"
-                className="btn-secondary captcha-refresh"
-                onClick={() => void refreshCaptcha()}
-                disabled={busy}
-                aria-label={t("promise.captcha_refresh")}
-              >
-                {t("promise.captcha_refresh")}
-              </button>
-            </div>
+        {mode === "kit" ? (
+          <label>
+            <span>{t("promise.kit")}</span>
+            <select value={kitId} onChange={(e) => setKitId(Number(e.target.value))}>
+              {kits.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+            {selectedKit?.items && selectedKit.items.length > 0 && (
+              <ul className="kit-preview">
+                {selectedKit.items.map((it) => (
+                  <li key={it.food_id}>
+                    {it.name}: {it.quantity} {it.unit}
+                  </li>
+                ))}
+              </ul>
+            )}
           </label>
-        </div>
+        ) : (
+          <div className="lines">
+            {lines.map((line, idx) => (
+              <div className="promise-row" key={idx}>
+                <label>
+                  <span>{t("promise.food")}</span>
+                  <select
+                    value={line.food_id}
+                    onChange={(e) => {
+                      const next = [...lines];
+                      next[idx] = { ...next[idx], food_id: Number(e.target.value) };
+                      setLines(next);
+                    }}
+                  >
+                    {foods.map((f) => (
+                      <option key={f.food_id} value={f.food_id}>
+                        {f.name} ({f.unit})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  <span>{t("promise.quantity")}</span>
+                  <input
+                    inputMode="decimal"
+                    value={line.quantity}
+                    onChange={(e) => {
+                      const next = [...lines];
+                      next[idx] = { ...next[idx], quantity: e.target.value };
+                      setLines(next);
+                    }}
+                    required
+                  />
+                </label>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() =>
+                setLines([...lines, { food_id: foods[0]?.food_id ?? 0, quantity: "" }])
+              }
+            >
+              {t("promise.add_line")}
+            </button>
+          </div>
+        )}
+
+        <CaptchaField onChange={setCaptcha} resetKey={captchaReset} />
 
         <button type="submit" className="btn-primary" disabled={busy || foods.length === 0}>
           {busy ? t("promise.submitting") : t("promise.submit")}

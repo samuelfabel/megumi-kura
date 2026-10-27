@@ -17,11 +17,16 @@ import (
 	"github.com/samuelfabel/megumi-kura/api/internal/database"
 	"github.com/samuelfabel/megumi-kura/api/internal/delivery"
 	"github.com/samuelfabel/megumi-kura/api/internal/food"
+	"github.com/samuelfabel/megumi-kura/api/internal/kit"
+	"github.com/samuelfabel/megumi-kura/api/internal/mail"
+	"github.com/samuelfabel/megumi-kura/api/internal/media"
 	"github.com/samuelfabel/megumi-kura/api/internal/need"
 	"github.com/samuelfabel/megumi-kura/api/internal/person"
+	"github.com/samuelfabel/megumi-kura/api/internal/projection"
 	"github.com/samuelfabel/megumi-kura/api/internal/promise"
 	"github.com/samuelfabel/megumi-kura/api/internal/server"
 	"github.com/samuelfabel/megumi-kura/api/internal/settings"
+	"github.com/samuelfabel/megumi-kura/api/internal/social"
 	"github.com/samuelfabel/megumi-kura/api/internal/stock"
 	"github.com/samuelfabel/megumi-kura/api/internal/user"
 )
@@ -58,6 +63,11 @@ func main() {
 	stockRepo := &stock.Repository{DB: db, AllowNegativeStock: cfg.AllowNegativeStock}
 	promises := &promise.Repository{DB: db}
 	basketRepo := &basket.Repository{DB: db, Stock: stockRepo}
+	kitRepo := &kit.Repository{DB: db, Stock: stockRepo}
+	mediaRepo := &media.Repository{DB: db}
+	mailRepo := &mail.Repository{DB: db}
+	socialRepo := &social.Repository{DB: db}
+	projRepo := &projection.Repository{DB: db}
 	settingsRepo := &settings.Repository{DB: db, Cfg: cfg}
 	categories := &category.Repository{DB: db}
 	needs := &need.Repository{DB: db}
@@ -69,21 +79,33 @@ func main() {
 		SessionHours: cfg.SessionHours,
 		CookieSecure: cfg.CookieSecure,
 	}
-	captchaSvc := captcha.New([]byte(cfg.SessionSecret), time.Duration(cfg.CaptchaTTLSeconds)*time.Second)
+	captchaSvc := captcha.New(captcha.Options{
+		Provider:          cfg.CaptchaProvider,
+		SiteKey:           cfg.CaptchaSiteKey,
+		SecretKey:         cfg.CaptchaSecretKey,
+		SessionHMACSecret: []byte(cfg.SessionSecret),
+		TTL:               time.Duration(cfg.CaptchaTTLSeconds) * time.Second,
+	})
 
 	api := &server.API{
-		Cfg:        cfg,
-		Auth:       authSvc,
-		Captcha:    captchaSvc,
-		Foods:      foods,
-		Stock:      stockRepo,
-		Promises:   promises,
-		Basket:     basketRepo,
-		Settings:   settingsRepo,
-		Categories: categories,
-		Needs:      needs,
-		People:     people,
-		Deliveries: deliveries,
+		Cfg:         cfg,
+		Auth:        authSvc,
+		Captcha:     captchaSvc,
+		Foods:       foods,
+		Stock:       stockRepo,
+		Promises:    promises,
+		Basket:      basketRepo,
+		Kits:        kitRepo,
+		Media:       mediaRepo,
+		Mail:        mailRepo,
+		Social:      socialRepo,
+		Projections: projRepo,
+		Users:       users,
+		Settings:    settingsRepo,
+		Categories:  categories,
+		Needs:       needs,
+		People:      people,
+		Deliveries:  deliveries,
 	}
 
 	srv := &http.Server{

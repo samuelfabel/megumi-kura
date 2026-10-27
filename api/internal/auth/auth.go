@@ -38,7 +38,18 @@ type SessionUser struct {
 }
 
 func (s *Service) Login(c *gin.Context, username, password string) (SessionUser, error) {
-	u, err := s.Users.FindByUsername(c.Request.Context(), username)
+	username = strings.TrimSpace(username)
+	var u user.User
+	var err error
+	if strings.Contains(username, "@") {
+		u, err = s.Users.FindByEmail(c.Request.Context(), username)
+	} else {
+		u, err = s.Users.FindByUsername(c.Request.Context(), username)
+		// Non-bootstrap accounts must login with email
+		if err == nil && !u.IsBootstrapAdmin {
+			return SessionUser{}, ErrInvalidCredentials
+		}
+	}
 	if err != nil {
 		if errors.Is(err, user.ErrNotFound) {
 			return SessionUser{}, ErrInvalidCredentials

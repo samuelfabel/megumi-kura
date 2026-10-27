@@ -4,6 +4,7 @@ import {
   createDelivery,
   type Delivery,
   type Food,
+  type Kit,
   type Person,
 } from "../../services/api";
 import { todayISO } from "./todayISO";
@@ -12,6 +13,7 @@ export function DeliveriesPanel({
   people,
   foods,
   basketItems,
+  kits,
   deliveries,
   onRefresh,
   onError,
@@ -19,11 +21,13 @@ export function DeliveriesPanel({
   people: Person[];
   foods: Food[];
   basketItems: Array<{ food_id: number; name: string; unit: string; quantity: string }>;
+  kits: Kit[];
   deliveries: Delivery[];
   onRefresh: () => void;
   onError: (s: string) => void;
 }) {
   const [personId, setPersonId] = useState(0);
+  const [kitId, setKitId] = useState(0);
   const [date, setDate] = useState(todayISO());
   const [note, setNote] = useState("");
   const [deduct, setDeduct] = useState(true);
@@ -38,11 +42,15 @@ export function DeliveriesPanel({
   }, [people, foods, personId, foodId]);
 
   const itemsPayload = useMemo(() => {
+    // The server expands the selected kit; only extra lines are sent.
+    if (kitId > 0) {
+      return extraItems.map((i) => ({ food_id: i.food_id, quantity: i.quantity }));
+    }
     const base = useBasket
       ? basketItems.map((i) => ({ food_id: i.food_id, quantity: i.quantity }))
       : [];
     return [...base, ...extraItems.map((i) => ({ food_id: i.food_id, quantity: i.quantity }))];
-  }, [useBasket, basketItems, extraItems]);
+  }, [useBasket, basketItems, extraItems, kitId]);
 
   return (
     <div className="panel-grid">
@@ -53,12 +61,13 @@ export function DeliveriesPanel({
           className="stack-form"
           onSubmit={(e) => {
             e.preventDefault();
-            if (itemsPayload.length === 0) {
+            if (kitId === 0 && itemsPayload.length === 0) {
               onError(t("admin.delivery_empty"));
               return;
             }
             void createDelivery({
               person_id: personId,
+              kit_id: kitId > 0 ? kitId : null,
               delivered_on: date,
               note,
               deduct_stock: deduct,
@@ -83,11 +92,34 @@ export function DeliveriesPanel({
             </select>
           </label>
           <label>
+            {t("promise.kit")}
+            <select
+              value={kitId}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                setKitId(v);
+                if (v > 0) setUseBasket(false);
+              }}
+            >
+              <option value={0}>{t("admin.kit_none")}</option>
+              {kits.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             {t("admin.delivery_date")}
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
           <label className="check-row">
-            <input type="checkbox" checked={useBasket} onChange={(e) => setUseBasket(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={useBasket && kitId === 0}
+              disabled={kitId > 0}
+              onChange={(e) => setUseBasket(e.target.checked)}
+            />
             {t("admin.include_basket")}
           </label>
           {useBasket && (

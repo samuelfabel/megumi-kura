@@ -1,16 +1,18 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { BasketHighlight } from "../components/BasketHighlight";
+import { MailSubscribe, SocialTeaser } from "../components/MailSocial";
 import { NeedsList } from "../components/NeedsList";
 import { PromiseForm } from "../components/PromiseForm";
 import { PromisesList } from "../components/PromisesList";
+import { ProjectionChart } from "../components/ProjectionChart";
 import { CommunityNeedsList, StockList } from "../components/StockList";
 import { useSummary } from "../hooks/useSummary";
 import { setLocale, t } from "../i18n";
 import { applyTheme } from "../theme/theme";
 
-type Props = { onAdmin: () => void };
+type Props = { onAdmin: () => void; onSocial: () => void };
 
-export function DashboardPage({ onAdmin }: Props) {
+export function DashboardPage({ onAdmin, onSocial }: Props) {
   const { data, error, loading, reload } = useSummary();
 
   useEffect(() => {
@@ -57,13 +59,35 @@ export function DashboardPage({ onAdmin }: Props) {
           <div className="dashboard-grid">
             <div className="dash-col">
               <BasketHighlight count={data.available_baskets} />
-              <StockList items={data.stock} />
-              <PromisesList items={data.promises_today} />
+              {(data.kits?.length ?? 0) > 0 && (
+                <section className="section">
+                  <h2>{t("dashboard.kits")}</h2>
+                  <ul className="kits-public">
+                    {data.kits!.map((k) => (
+                      <li key={k.id}>
+                        <strong>{k.name}</strong>
+                        <span>
+                          {k.available ?? 0} {t("dashboard.kits_available")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              )}
+              <StockList items={data.stock ?? []} />
+              <PromisesList items={data.promises_today ?? []} />
+              <ProjectionChart foods={data.stock ?? []} />
             </div>
             <div className="dash-col">
-              <PromiseForm foods={data.stock} onSubmitted={() => void reload()} />
+              <PromiseForm
+                foods={data.stock ?? []}
+                kits={data.kits ?? []}
+                onSubmitted={() => void reload()}
+              />
               <CommunityNeedsList items={data.community_needs ?? []} />
-              <NeedsList items={data.needs} />
+              <NeedsList items={data.needs ?? []} risks={data.shortage_risks ?? []} />
+              <MailSubscribe />
+              <SocialTeaser onOpen={onSocial} />
             </div>
           </div>
         )}
@@ -77,3 +101,6 @@ export function DashboardPage({ onAdmin }: Props) {
     </div>
   );
 }
+
+// silence unused if tree-shaken
+void useState;

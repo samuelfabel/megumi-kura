@@ -18,6 +18,7 @@ type Food struct {
 	CategoryID   *int64    `json:"category_id,omitempty"`
 	CategoryName string    `json:"category_name,omitempty"`
 	CategoryCode string    `json:"category_code,omitempty"`
+	IconMediaID  *int64    `json:"icon_media_id,omitempty"`
 	SortOrder    int       `json:"sort_order"`
 	Active       bool      `json:"active"`
 	CreatedAt    time.Time `json:"created_at"`
@@ -39,7 +40,7 @@ type Repository struct {
 func (r *Repository) List(ctx context.Context) ([]Food, error) {
 	rows, err := r.DB.QueryContext(ctx, `
 		SELECT f.id, f.code, f.name, f.unit, f.category_id, COALESCE(c.name, ''), COALESCE(c.code, ''),
-		       f.sort_order, f.active, f.created_at, f.updated_at
+		       f.icon_media_id, f.sort_order, f.active, f.created_at, f.updated_at
 		FROM foods f
 		LEFT JOIN item_categories c ON c.id = f.category_id
 		ORDER BY COALESCE(c.sort_order, 999), f.sort_order ASC, f.name ASC`)
@@ -51,13 +52,30 @@ func (r *Repository) List(ctx context.Context) ([]Food, error) {
 	var out []Food
 	for rows.Next() {
 		var f Food
+		var icon sql.NullInt64
 		if err := rows.Scan(&f.ID, &f.Code, &f.Name, &f.Unit, &f.CategoryID, &f.CategoryName, &f.CategoryCode,
-			&f.SortOrder, &f.Active, &f.CreatedAt, &f.UpdatedAt); err != nil {
+			&icon, &f.SortOrder, &f.Active, &f.CreatedAt, &f.UpdatedAt); err != nil {
 			return nil, err
+		}
+		if icon.Valid {
+			f.IconMediaID = &icon.Int64
 		}
 		out = append(out, f)
 	}
 	return out, rows.Err()
+}
+
+func (r *Repository) SetIcon(ctx context.Context, id int64, iconMediaID *int64) error {
+	res, err := r.DB.ExecContext(ctx, `
+		UPDATE foods SET icon_media_id = $2, updated_at = NOW() WHERE id = $1`, id, iconMediaID)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 func (r *Repository) Create(ctx context.Context, in CreateInput) (Food, error) {

@@ -20,6 +20,9 @@ type Config struct {
 	AllowNegativeStock bool
 	CookieSecure       bool
 	SessionHours       int
+	CaptchaProvider    string // math | google | cloudflare
+	CaptchaSiteKey     string
+	CaptchaSecretKey   string
 	CaptchaTTLSeconds  int
 }
 
@@ -38,6 +41,9 @@ func Load() Config {
 		AllowNegativeStock: getenvBool("MK_ALLOW_NEGATIVE_STOCK", false),
 		CookieSecure:       getenvBool("MK_COOKIE_SECURE", false),
 		SessionHours:       getenvInt("MK_SESSION_HOURS", 24),
+		CaptchaProvider:    getenv("MK_CAPTCHA_PROVIDER", "math"),
+		CaptchaSiteKey:     getenv("MK_CAPTCHA_SITE_KEY", ""),
+		CaptchaSecretKey:   getenv("MK_CAPTCHA_SECRET_KEY", ""),
 		CaptchaTTLSeconds:  getenvInt("MK_CAPTCHA_TTL_SECONDS", 600),
 	}
 }

@@ -24,6 +24,7 @@ export function PeoplePanel({
 }) {
   const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
+  const [pickupFreq, setPickupFreq] = useState("");
   const [personId, setPersonId] = useState<number>(0);
   const [foodId, setFoodId] = useState<number>(0);
   const [qty, setQty] = useState("1");
@@ -48,10 +49,15 @@ export function PeoplePanel({
           className="stack-form"
           onSubmit={(e) => {
             e.preventDefault();
-            void createPerson({ full_name: name, notes })
+            void createPerson({
+              full_name: name,
+              notes,
+              pickup_frequency: pickupFreq || null,
+            })
               .then(() => {
                 setName("");
                 setNotes("");
+                setPickupFreq("");
                 onRefresh();
               })
               .catch((err: Error) => onError(err.message));
@@ -65,6 +71,15 @@ export function PeoplePanel({
             {t("admin.person_notes")}
             <input value={notes} onChange={(e) => setNotes(e.target.value)} />
           </label>
+          <label>
+            {t("admin.pickup_frequency")}
+            <select value={pickupFreq} onChange={(e) => setPickupFreq(e.target.value)}>
+              <option value="">{t("admin.freq_none")}</option>
+              <option value="weekly">{t("admin.freq_weekly")}</option>
+              <option value="biweekly">{t("admin.freq_biweekly")}</option>
+              <option value="monthly">{t("admin.freq_monthly")}</option>
+            </select>
+          </label>
           <button type="submit" className="btn-primary">
             {t("admin.add_person")}
           </button>
@@ -75,6 +90,12 @@ export function PeoplePanel({
               <button type="button" className={personId === p.id ? "chip active" : "chip"} onClick={() => setPersonId(p.id)}>
                 {p.full_name}
               </button>
+              {p.pickup_frequency && <span className="muted tiny">{p.pickup_frequency}</span>}
+              {p.last_delivered_on && (
+                <span className="muted tiny">
+                  {t("admin.last_delivery")}: {p.last_delivered_on}
+                </span>
+              )}
               {p.notes && <span className="muted tiny">{p.notes}</span>}
             </li>
           ))}

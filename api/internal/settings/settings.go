@@ -16,6 +16,8 @@ type PublicSettings struct {
 	SecondaryColor string `json:"secondary_color"`
 	AccentColor    string `json:"accent_color"`
 	DefaultLocale  string `json:"default_locale"`
+	CaptchaProvider string `json:"captcha_provider"`
+	CaptchaSiteKey  string `json:"captcha_site_key,omitempty"`
 }
 
 type Repository struct {
@@ -26,14 +28,22 @@ type Repository struct {
 func (r *Repository) Public(ctx context.Context) (PublicSettings, error) {
 	// Defaults from config / env, then overlay DB settings.
 	out := PublicSettings{
-		Name:           r.Cfg.SiteName,
-		Description:    r.Cfg.SiteDescription,
-		PrimaryColor:   r.Cfg.ThemePrimary,
-		SecondaryColor: r.Cfg.ThemeSecondary,
-		AccentColor:    r.Cfg.ThemeAccent,
-		DefaultLocale:  r.Cfg.DefaultLocale,
-		Logo:           "",
-		Favicon:        "/favicon.svg",
+		Name:            r.Cfg.SiteName,
+		Description:     r.Cfg.SiteDescription,
+		PrimaryColor:    r.Cfg.ThemePrimary,
+		SecondaryColor:  r.Cfg.ThemeSecondary,
+		AccentColor:     r.Cfg.ThemeAccent,
+		DefaultLocale:   r.Cfg.DefaultLocale,
+		Logo:            "",
+		Favicon:         "/favicon.svg",
+		CaptchaProvider: r.Cfg.CaptchaProvider,
+		CaptchaSiteKey:  r.Cfg.CaptchaSiteKey,
+	}
+	if out.CaptchaProvider == "" {
+		out.CaptchaProvider = "math"
+	}
+	if out.CaptchaProvider == "math" {
+		out.CaptchaSiteKey = ""
 	}
 
 	rows, err := r.DB.QueryContext(ctx, `SELECT key, value FROM settings`)

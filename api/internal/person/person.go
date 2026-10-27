@@ -13,12 +13,14 @@ import (
 var ErrNotFound = errors.New("person not found")
 
 type Person struct {
-	ID        int64     `json:"id"`
-	FullName  string    `json:"full_name"`
-	Notes     string    `json:"notes"`
-	Active    bool      `json:"active"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID               int64     `json:"id"`
+	FullName         string    `json:"full_name"`
+	Notes            string    `json:"notes"`
+	Active           bool      `json:"active"`
+	PickupFrequency  *string   `json:"pickup_frequency,omitempty"`
+	LastDeliveredOn  *string   `json:"last_delivered_on,omitempty"`
+	CreatedAt        time.Time `json:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at"`
 }
 
 type Need struct {
@@ -38,8 +40,9 @@ type Need struct {
 }
 
 type CreatePersonInput struct {
-	FullName string `json:"full_name"`
-	Notes    string `json:"notes"`
+	FullName        string  `json:"full_name"`
+	Notes           string  `json:"notes"`
+	PickupFrequency *string `json:"pickup_frequency"`
 }
 
 type CreateNeedInput struct {
@@ -57,9 +60,13 @@ type Repository struct {
 
 func (r *Repository) List(ctx context.Context) ([]Person, error) {
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT id, full_name, notes, active, created_at, updated_at
-		FROM people
-		ORDER BY full_name ASC`)
+		SELECT p.id, p.full_name, p.notes, p.active, p.pickup_frequency,
+		       to_char(MAX(d.delivered_on), 'YYYY-MM-DD'),
+		       p.created_at, p.updated_at
+		FROM people p
+		LEFT JOIN deliveries d ON d.person_id = p.id
+		GROUP BY p.id
+		ORDER BY p.full_name ASC`)
 	if err != nil {
 		return nil, err
 	}
@@ -67,8 +74,15 @@ func (r *Repository) List(ctx context.Context) ([]Person, error) {
 	var out []Person
 	for rows.Next() {
 		var p Person
-		if err := rows.Scan(&p.ID, &p.FullName, &p.Notes, &p.Active, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		var freq, last sql.NullString
+		if err := rows.Scan(&p.ID, &p.FullName, &p.Notes, &p.Active, &freq, &last, &p.CreatedAt, &p.UpdatedAt); err != nil {
 			return nil, err
+		}
+		if freq.Valid {
+			p.PickupFrequency = &freq.String
+		}
+		if last.Valid {
+			p.LastDeliveredOn = &last.String
 		}
 		out = append(out, p)
 	}
@@ -80,14 +94,25 @@ func (r *Repository) Create(ctx context.Context, in CreatePersonInput) (Person, 
 	if in.FullName == "" {
 		return Person{}, errors.New("full_name is required")
 	}
+	if err := validatePickupFreq(in.PickupFrequency); err != nil {
+		return Person{}, err
+	}
 	var p Person
+	var freq, last sql.NullString
 	err := r.DB.QueryRowContext(ctx, `
-		INSERT INTO people(full_name, notes)
-		VALUES ($1, $2)
-		RETURNING id, full_name, notes, active, created_at, updated_at`,
-		in.FullName, strings.TrimSpace(in.Notes),
-	).Scan(&p.ID, &p.FullName, &p.Notes, &p.Active, &p.CreatedAt, &p.UpdatedAt)
-	return p, err
+		INSERT INTO people(full_name, notes, pickup_frequency)
+		VALUES ($1, $2, $3)
+		RETURNING id, full_name, notes, active, pickup_frequency, created_at, updated_at`,
+		in.FullName, strings.TrimSpace(in.Notes), in.PickupFrequency,
+	).Scan(&p.ID, &p.FullName, &p.Notes, &p.Active, &freq, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return Person{}, err
+	}
+	if freq.Valid {
+		p.PickupFrequency = &freq.String
+	}
+	_ = last
+	return p, nil
 }
 
 func (r *Repository) Update(ctx context.Context, id int64, in CreatePersonInput, active bool) (Person, error) {
@@ -95,18 +120,47 @@ func (r *Repository) Update(ctx context.Context, id int64, in CreatePersonInput,
 	if in.FullName == "" {
 		return Person{}, errors.New("full_name is required")
 	}
+	if err := validatePickupFreq(in.PickupFrequency); err != nil {
+		return Person{}, err
+	}
 	var p Person
+	var freq sql.NullString
 	err := r.DB.QueryRowContext(ctx, `
 		UPDATE people
-		SET full_name = $2, notes = $3, active = $4, updated_at = NOW()
+		SET full_name = $2, notes = $3, active = $4, pickup_frequency = $5, updated_at = NOW()
 		WHERE id = $1
-		RETURNING id, full_name, notes, active, created_at, updated_at`,
-		id, in.FullName, strings.TrimSpace(in.Notes), active,
-	).Scan(&p.ID, &p.FullName, &p.Notes, &p.Active, &p.CreatedAt, &p.UpdatedAt)
+		RETURNING id, full_name, notes, active, pickup_frequency, created_at, updated_at`,
+		id, in.FullName, strings.TrimSpace(in.Notes), active, in.PickupFrequency,
+	).Scan(&p.ID, &p.FullName, &p.Notes, &p.Active, &freq, &p.CreatedAt, &p.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Person{}, ErrNotFound
 	}
-	return p, err
+	if err != nil {
+		return Person{}, err
+	}
+	if freq.Valid {
+		p.PickupFrequency = &freq.String
+	}
+	// attach last delivery
+	var last sql.NullString
+	_ = r.DB.QueryRowContext(ctx, `
+		SELECT to_char(MAX(delivered_on), 'YYYY-MM-DD') FROM deliveries WHERE person_id = $1`, id).Scan(&last)
+	if last.Valid {
+		p.LastDeliveredOn = &last.String
+	}
+	return p, nil
+}
+
+func validatePickupFreq(f *string) error {
+	if f == nil || *f == "" {
+		return nil
+	}
+	switch *f {
+	case "weekly", "biweekly", "monthly":
+		return nil
+	default:
+		return errors.New("pickup_frequency must be weekly, biweekly or monthly")
+	}
 }
 
 func (r *Repository) ListNeeds(ctx context.Context, personID *int64) ([]Need, error) {

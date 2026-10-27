@@ -84,6 +84,11 @@ func (q Q) Sub(other Q) Q {
 	return Q{rat: r}
 }
 
+func (q Q) Mul(other Q) Q {
+	r := new(big.Rat).Mul(q.ensure().rat, other.ensure().rat)
+	return Q{rat: r}
+}
+
 // DivFloorInt returns floor(q / other) as int64.
 func (q Q) DivFloorInt(other Q) int64 {
 	if other.IsZero() {

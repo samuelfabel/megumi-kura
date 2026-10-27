@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import { AdminPage } from "./pages/AdminPage";
 import { DashboardPage } from "./pages/DashboardPage";
+import { SocialPage } from "./pages/SocialPage";
 
-type View = "public" | "admin";
+type View = "public" | "admin" | "social";
 
 function viewFromHash(): View {
-  return window.location.hash.replace(/^#/, "") === "admin" ? "admin" : "public";
+  const h = window.location.hash.replace(/^#/, "");
+  if (h === "admin" || h.startsWith("admin")) return "admin";
+  if (h === "social" || h.startsWith("social")) return "social";
+  return "public";
 }
 
 export default function App() {
@@ -27,8 +31,16 @@ export default function App() {
     setView("public");
   }
 
+  function goSocial() {
+    window.location.hash = "social";
+    setView("social");
+  }
+
   if (view === "admin") {
     return <AdminPage onBack={goPublic} />;
   }
-  return <DashboardPage onAdmin={goAdmin} />;
+  if (view === "social") {
+    return <SocialPage onBack={goPublic} />;
+  }
+  return <DashboardPage onAdmin={goAdmin} onSocial={goSocial} />;
 }

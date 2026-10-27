@@ -37,6 +37,24 @@ type CreateInput struct {
 	PersonName  string     `json:"person_name"`
 	Quantity    quantity.Q `json:"quantity"`
 	PromiseDate string     `json:"promise_date"`
+	BatchID     *int64     `json:"batch_id,omitempty"`
+}
+
+type BatchItemInput struct {
+	FoodID   int64      `json:"food_id"`
+	Quantity quantity.Q `json:"quantity"`
+}
+
+type BatchInput struct {
+	PersonName  string           `json:"person_name"`
+	PromiseDate string           `json:"promise_date"`
+	KitID       *int64           `json:"kit_id"`
+	Items       []BatchItemInput `json:"items"`
+}
+
+type BatchResult struct {
+	BatchID int64     `json:"batch_id"`
+	Items   []Promise `json:"items"`
 }
 
 type Repository struct {
@@ -135,12 +153,60 @@ func (r *Repository) Create(ctx context.Context, in CreateInput) (Promise, error
 	}
 	var p Promise
 	err := r.DB.QueryRowContext(ctx, `
-		INSERT INTO promises(food_id, person_name, quantity, promise_date)
-		VALUES ($1, $2, $3, $4::date)
+		INSERT INTO promises(food_id, person_name, quantity, promise_date, batch_id)
+		VALUES ($1, $2, $3, $4::date, $5)
 		RETURNING id, food_id, person_name, quantity, to_char(promise_date, 'YYYY-MM-DD'), created_at, updated_at`,
-		in.FoodID, in.PersonName, in.Quantity, in.PromiseDate,
+		in.FoodID, in.PersonName, in.Quantity, in.PromiseDate, in.BatchID,
 	).Scan(&p.ID, &p.FoodID, &p.PersonName, &p.Quantity, &p.PromiseDate, &p.CreatedAt, &p.UpdatedAt)
 	return p, err
+}
+
+// CreateBatch inserts a batch header and one promise row per item (kit items should be expanded by caller).
+func (r *Repository) CreateBatch(ctx context.Context, in BatchInput) (BatchResult, error) {
+	in.PersonName = strings.TrimSpace(in.PersonName)
+	if in.PersonName == "" || strings.TrimSpace(in.PromiseDate) == "" {
+		return BatchResult{}, errors.New("person_name and promise_date are required")
+	}
+	if len(in.Items) == 0 {
+		return BatchResult{}, errors.New("at least one item is required")
+	}
+	tx, err := r.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return BatchResult{}, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var batchID int64
+	err = tx.QueryRowContext(ctx, `
+		INSERT INTO promise_batches(person_name, kit_id, promise_date)
+		VALUES ($1, $2, $3::date) RETURNING id`,
+		in.PersonName, in.KitID, in.PromiseDate,
+	).Scan(&batchID)
+	if err != nil {
+		return BatchResult{}, err
+	}
+
+	var items []Promise
+	for _, it := range in.Items {
+		if it.FoodID == 0 || it.Quantity.Sign() <= 0 {
+			return BatchResult{}, errors.New("each item needs food_id and quantity > 0")
+		}
+		var p Promise
+		err := tx.QueryRowContext(ctx, `
+			INSERT INTO promises(food_id, person_name, quantity, promise_date, batch_id)
+			VALUES ($1, $2, $3, $4::date, $5)
+			RETURNING id, food_id, person_name, quantity, to_char(promise_date, 'YYYY-MM-DD'), created_at, updated_at`,
+			it.FoodID, in.PersonName, it.Quantity, in.PromiseDate, batchID,
+		).Scan(&p.ID, &p.FoodID, &p.PersonName, &p.Quantity, &p.PromiseDate, &p.CreatedAt, &p.UpdatedAt)
+		if err != nil {
+			return BatchResult{}, err
+		}
+		items = append(items, p)
+	}
+	if err := tx.Commit(); err != nil {
+		return BatchResult{}, err
+	}
+	return BatchResult{BatchID: batchID, Items: items}, nil
 }
 
 func (r *Repository) Delete(ctx context.Context, id int64) error {
