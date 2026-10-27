@@ -11,6 +11,7 @@ import (
 
 	"github.com/samuelfabel/megumi-kura/api/internal/auth"
 	"github.com/samuelfabel/megumi-kura/api/internal/basket"
+	"github.com/samuelfabel/megumi-kura/api/internal/captcha"
 	"github.com/samuelfabel/megumi-kura/api/internal/category"
 	"github.com/samuelfabel/megumi-kura/api/internal/config"
 	"github.com/samuelfabel/megumi-kura/api/internal/database"
@@ -68,10 +69,12 @@ func main() {
 		SessionHours: cfg.SessionHours,
 		CookieSecure: cfg.CookieSecure,
 	}
+	captchaSvc := captcha.New([]byte(cfg.SessionSecret), time.Duration(cfg.CaptchaTTLSeconds)*time.Second)
 
 	api := &server.API{
 		Cfg:        cfg,
 		Auth:       authSvc,
+		Captcha:    captchaSvc,
 		Foods:      foods,
 		Stock:      stockRepo,
 		Promises:   promises,

@@ -2,7 +2,8 @@
 
 ## Resumo
 
-A área **pública** não exige login.
+A área **pública** não exige login. A criação pública de promessas exige
+[captcha](./captcha.md).
 
 A área **admin** exige autenticação. O fluxo atual é:
 

@@ -2,7 +2,8 @@
 
 ## Summary
 
-The **public** API does not require login.
+The **public** API does not require login. Public promise creation requires
+[captcha](./captcha.md).
 
 The **admin** API requires authentication:
 

@@ -12,6 +12,7 @@ import (
 
 	"github.com/samuelfabel/megumi-kura/api/internal/auth"
 	"github.com/samuelfabel/megumi-kura/api/internal/basket"
+	"github.com/samuelfabel/megumi-kura/api/internal/captcha"
 	"github.com/samuelfabel/megumi-kura/api/internal/category"
 	"github.com/samuelfabel/megumi-kura/api/internal/config"
 	"github.com/samuelfabel/megumi-kura/api/internal/delivery"
@@ -27,6 +28,7 @@ import (
 type API struct {
 	Cfg        config.Config
 	Auth       *auth.Service
+	Captcha    *captcha.Service
 	Foods      *food.Repository
 	Stock      *stock.Repository
 	Promises   *promise.Repository
@@ -51,6 +53,7 @@ func (a *API) Router() *gin.Engine {
 			pub.GET("/stock", a.getPublicStock)
 			pub.GET("/promises", a.getPublicPromises)
 			pub.POST("/promises", a.createPublicPromise)
+			pub.GET("/captcha", a.getPublicCaptcha)
 			pub.GET("/settings", a.getPublicSettings)
 			pub.GET("/needs", a.getPublicNeeds)
 		}
@@ -271,14 +274,34 @@ func (a *API) getPublicPromises(c *gin.Context) {
 }
 
 // createPublicPromise lets a donor register a contribution promise without admin login.
-// The response never echoes the person name back in list endpoints; only a confirmation id.
+// Requires a valid captcha challenge. The response never echoes the person name back
+// in list endpoints; only a confirmation id.
 func (a *API) createPublicPromise(c *gin.Context) {
-	var in promise.CreateInput
-	if err := c.ShouldBindJSON(&in); err != nil {
+	var body struct {
+		promise.CreateInput
+		CaptchaToken  string `json:"captcha_token"`
+		CaptchaAnswer string `json:"captcha_answer"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
-	p, err := a.Promises.Create(c.Request.Context(), in)
+	if a.Captcha == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "captcha unavailable"})
+		return
+	}
+	if err := a.Captcha.Verify(body.CaptchaToken, body.CaptchaAnswer); err != nil {
+		switch {
+		case errors.Is(err, captcha.ErrExpired):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "captcha expired"})
+		case errors.Is(err, captcha.ErrUsed):
+			c.JSON(http.StatusBadRequest, gin.H{"error": "captcha already used"})
+		default:
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid captcha"})
+		}
+		return
+	}
+	p, err := a.Promises.Create(c.Request.Context(), body.CreateInput)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -289,6 +312,19 @@ func (a *API) createPublicPromise(c *gin.Context) {
 		"quantity":     p.Quantity,
 		"promise_date": p.PromiseDate,
 	})
+}
+
+func (a *API) getPublicCaptcha(c *gin.Context) {
+	if a.Captcha == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "captcha unavailable"})
+		return
+	}
+	ch, err := a.Captcha.Issue()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue captcha"})
+		return
+	}
+	c.JSON(http.StatusOK, ch)
 }
 
 func (a *API) getPublicSettings(c *gin.Context) {

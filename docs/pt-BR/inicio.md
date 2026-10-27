@@ -10,6 +10,8 @@ estoque, cestas básicas e promessas de contribuição.
 3. **Cesta básica** — composição configurável; quantidade possível é calculada
 4. **Promessas** — expectativa futura; não são estoque real e expiram por data
 
+Promessas públicas exigem [captcha](./captcha.md) no envio.
+
 ## Subir localmente
 
 ```bash

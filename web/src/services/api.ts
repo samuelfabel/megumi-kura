@@ -125,7 +125,23 @@ export type PromiseInput = {
   person_name: string;
   quantity: string;
   promise_date: string;
+  captcha_token?: string;
+  captcha_answer?: string;
 };
+
+export type CaptchaChallenge = {
+  captcha_token: string;
+  question: string;
+};
+
+export class ApiError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -135,13 +151,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error || `HTTP ${res.status}`);
+    throw new ApiError(
+      res.status,
+      (body as { error?: string }).error || `HTTP ${res.status}`,
+    );
   }
   return res.json() as Promise<T>;
 }
 
 export function fetchSummary() {
   return request<Summary>("/api/v1/public/summary");
+}
+
+export function fetchCaptcha() {
+  return request<CaptchaChallenge>("/api/v1/public/captcha");
 }
 
 export function createPublicPromise(input: PromiseInput) {

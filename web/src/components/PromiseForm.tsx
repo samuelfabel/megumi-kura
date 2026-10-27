@@ -1,10 +1,11 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { t } from "../i18n";
-import type { StockItem } from "../services/api";
+import { ApiError, fetchCaptcha, type StockItem } from "../services/api";
 import {
+  flushNextQueuedPromise,
   pendingPromiseCount,
   submitPromiseOfflineFirst,
-  watchOnlineFlush,
+  watchOnline,
 } from "../services/promiseQueue";
 
 type Props = {
@@ -26,9 +27,25 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
   const [qty, setQty] = useState("");
   const [date, setDate] = useState(todayISO());
   const [busy, setBusy] = useState(false);
-  const [feedback, setFeedback] = useState<"sent" | "queued" | null>(null);
+  const [feedback, setFeedback] = useState<"sent" | "queued" | "flushed" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(0);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const [captchaQuestion, setCaptchaQuestion] = useState("");
+  const [captchaAnswer, setCaptchaAnswer] = useState("");
+
+  const refreshCaptcha = useCallback(async () => {
+    try {
+      const ch = await fetchCaptcha();
+      setCaptchaToken(ch.captcha_token);
+      setCaptchaQuestion(ch.question);
+      setCaptchaAnswer("");
+    } catch {
+      setCaptchaToken("");
+      setCaptchaQuestion("");
+      setError(t("promise.error_captcha_load"));
+    }
+  }, []);
 
   useEffect(() => {
     if (foods[0] && foodId === 0) setFoodId(foods[0].food_id);
@@ -36,15 +53,23 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
 
   useEffect(() => {
     setPending(pendingPromiseCount());
-    return watchOnlineFlush((sent) => {
-      if (sent > 0) {
-        setPending(pendingPromiseCount());
-        onSubmitted();
-      }
-    });
-  }, [onSubmitted]);
+    void refreshCaptcha();
+    return watchOnline(() => setPending(pendingPromiseCount()));
+  }, [refreshCaptcha]);
 
   const selected = foods.find((f) => f.food_id === foodId);
+
+  function mapCaptchaError(err: unknown): string {
+    if (err instanceof ApiError) {
+      if (err.message.includes("captcha")) {
+        if (err.message.includes("expired")) return t("promise.error_captcha_expired");
+        if (err.message.includes("used")) return t("promise.error_captcha_used");
+        return t("promise.error_captcha");
+      }
+      return err.message || t("promise.error_generic");
+    }
+    return t("promise.error_generic");
+  }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -54,6 +79,10 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
       setError(t("promise.error_required"));
       return;
     }
+    if (navigator.onLine && (!captchaToken || !captchaAnswer.trim())) {
+      setError(t("promise.error_captcha_required"));
+      return;
+    }
     setBusy(true);
     try {
       const result = await submitPromiseOfflineFirst({
@@ -61,14 +90,45 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
         person_name: person.trim(),
         quantity: qty.trim(),
         promise_date: date,
+        captcha_token: captchaToken,
+        captcha_answer: captchaAnswer.trim(),
       });
       setFeedback(result.status);
       setPending(pendingPromiseCount());
       setPerson("");
       setQty("");
+      await refreshCaptcha();
       if (result.status === "sent") onSubmitted();
-    } catch {
-      setError(t("promise.error_generic"));
+    } catch (err) {
+      setError(mapCaptchaError(err));
+      await refreshCaptcha();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onFlushPending() {
+    setError(null);
+    setFeedback(null);
+    if (!captchaToken || !captchaAnswer.trim()) {
+      setError(t("promise.error_captcha_required"));
+      return;
+    }
+    setBusy(true);
+    try {
+      const sent = await flushNextQueuedPromise({
+        captcha_token: captchaToken,
+        captcha_answer: captchaAnswer.trim(),
+      });
+      setPending(pendingPromiseCount());
+      await refreshCaptcha();
+      if (sent) {
+        setFeedback("flushed");
+        onSubmitted();
+      }
+    } catch (err) {
+      setError(mapCaptchaError(err));
+      await refreshCaptcha();
     } finally {
       setBusy(false);
     }
@@ -131,17 +191,57 @@ export function PromiseForm({ foods, onSubmitted }: Props) {
           </label>
         </div>
 
+        <div className="captcha-row">
+          <label className="captcha-field">
+            <span>{t("promise.captcha")}</span>
+            <div className="captcha-input-row">
+              <span className="captcha-question" aria-live="polite">
+                {captchaQuestion ? `${captchaQuestion} =` : "…"}
+              </span>
+              <input
+                inputMode="numeric"
+                value={captchaAnswer}
+                onChange={(e) => setCaptchaAnswer(e.target.value)}
+                name="captcha_answer"
+                autoComplete="off"
+                required={typeof navigator !== "undefined" ? navigator.onLine : true}
+                aria-label={t("promise.captcha")}
+              />
+              <button
+                type="button"
+                className="btn-secondary captcha-refresh"
+                onClick={() => void refreshCaptcha()}
+                disabled={busy}
+                aria-label={t("promise.captcha_refresh")}
+              >
+                {t("promise.captcha_refresh")}
+              </button>
+            </div>
+          </label>
+        </div>
+
         <button type="submit" className="btn-primary" disabled={busy || foods.length === 0}>
           {busy ? t("promise.submitting") : t("promise.submit")}
         </button>
 
         {feedback === "sent" && <p className="ok-text">{t("promise.success")}</p>}
         {feedback === "queued" && <p className="ok-text">{t("promise.queued")}</p>}
+        {feedback === "flushed" && <p className="ok-text">{t("promise.flushed")}</p>}
         {error && <p className="error-text">{error}</p>}
         {pending > 0 && (
-          <p className="muted pending-note">
-            {t("promise.pending").replace("{count}", String(pending))}
-          </p>
+          <div className="pending-box">
+            <p className="muted pending-note">
+              {t("promise.pending").replace("{count}", String(pending))}
+            </p>
+            <button
+              type="button"
+              className="btn-secondary"
+              disabled={busy || !navigator.onLine}
+              onClick={() => void onFlushPending()}
+            >
+              {t("promise.flush_one")}
+            </button>
+          </div>
         )}
         <p className="privacy-note">{t("promise.privacy")}</p>
       </form>
