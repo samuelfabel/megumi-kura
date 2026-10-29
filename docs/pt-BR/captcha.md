@@ -1,41 +1,55 @@
 # Captcha em promessas públicas
 
-A inclusão de promessa pelo endpoint público exige um **captcha aritmético**
-self-hosted (sem provedor externo).
+A inclusão de promessa pelo endpoint público exige captcha. O provedor é
+**configurável** por variável de ambiente.
 
-## Fluxo
+## Provedores
 
-1. O cliente chama `GET /api/v1/public/captcha`
-2. A API devolve `{ captcha_token, question }` (ex.: `"7 + 4"`)
-3. O doador resolve a conta e envia `POST /api/v1/public/promises` com:
-   - dados da promessa (`food_id`, `person_name`, `quantity`, `promise_date`)
-   - `captcha_token` e `captcha_answer`
-4. O servidor valida assinatura HMAC, validade, resposta e uso único do token
+| `MK_CAPTCHA_PROVIDER` | Descrição |
+| --- | --- |
+| `math` (padrão) | Desafio aritmético self-hosted (bom para desenvolvimento local) |
+| `google` | Google reCAPTCHA v2 (“Não sou um robô”) |
+| `cloudflare` | Cloudflare Turnstile |
 
-Promessas criadas pela área **admin** (`POST /api/v1/admin/promises`) **não**
-exigem captcha (já autenticadas).
-
-## Formato do token
-
-Mesmo padrão da sessão (HMAC-SHA256 com `MK_SESSION_SECRET`):
-
-```text
-payload = "{expUnixMilli}|{a}|{b}|{nonce}"
-token   = base64url(payload) + "." + base64url(HMAC-SHA256(payload))
-```
-
-A resposta correta é `a + b`. Tokens usados ou expirados são rejeitados.
-
-## Offline
-
-Sem conexão, a promessa pode ser enfileirada no aparelho **sem** captcha.
-Ao voltar online, o usuário resolve um captcha novo e envia a fila
-(um item por verificação). Não há flush silencioso automático, porque a API
-exige captcha em cada `POST` público.
+Em produção, use `google` ou `cloudflare`. O modo `math` é fácil de automatizar.
 
 ## Configuração
 
-| Variável | Função |
-| --- | --- |
-| `MK_SESSION_SECRET` | chave HMAC do token de captcha (mesma da sessão) |
-| `MK_CAPTCHA_TTL_SECONDS` | validade do desafio (padrão 600) |
+```bash
+# Exemplo Google reCAPTCHA v2
+MK_CAPTCHA_PROVIDER=google
+MK_CAPTCHA_SITE_KEY=sua_site_key
+MK_CAPTCHA_SECRET_KEY=sua_secret_key
+
+# Exemplo Cloudflare Turnstile
+MK_CAPTCHA_PROVIDER=cloudflare
+MK_CAPTCHA_SITE_KEY=sua_site_key
+MK_CAPTCHA_SECRET_KEY=sua_secret_key
+
+# Dev local (padrão)
+MK_CAPTCHA_PROVIDER=math
+# MK_CAPTCHA_TTL_SECONDS=600
+```
+
+- `MK_CAPTCHA_SITE_KEY` — chave pública (exposta ao browser)
+- `MK_CAPTCHA_SECRET_KEY` — chave secreta (só no servidor; para `math`, usa `MK_SESSION_SECRET`)
+
+## Fluxo
+
+1. `GET /api/v1/public/captcha` devolve o desafio do provedor ativo:
+   - `math`: `{ provider, captcha_token, question }`
+   - `google` / `cloudflare`: `{ provider, site_key }`
+2. O formulário público renderiza o widget correspondente
+3. `POST /api/v1/public/promises` (ou `/promise-batches`) envia `captcha_token`
+   (e `captcha_answer` só no modo `math`)
+4. O servidor valida via HMAC (`math`) ou siteverify do provedor
+
+`GET /api/v1/public/settings` também inclui `captcha_provider` e `captcha_site_key`
+(sem a secret).
+
+Promessas admin **não** exigem captcha.
+
+## Offline
+
+Sem conexão, a promessa pode ser enfileirada **sem** captcha. Ao voltar online,
+o usuário resolve o widget/desafio e envia a fila (um item por verificação).

@@ -3,6 +3,7 @@ import { t } from "../i18n";
 import {
   fetchMe,
   getBasket,
+  listAdminKits,
   listCategories,
   listCommunityNeeds,
   listDeliveries,
@@ -15,6 +16,7 @@ import {
   type CommunityNeed,
   type Delivery,
   type Food,
+  type Kit,
   type Person,
   type PersonNeed,
 } from "../services/api";
@@ -24,9 +26,19 @@ import { DeliveriesPanel } from "./admin/DeliveriesPanel";
 import { NeedsPanel } from "./admin/NeedsPanel";
 import { CatalogPanel } from "./admin/CatalogPanel";
 import { StockPanel } from "./admin/StockPanel";
+import { KitsPanel, MailPanel, SocialAdminPanel, UsersPanel } from "./AdminExtras";
 
 type Props = { onBack: () => void };
-type Tab = "stock" | "catalog" | "needs" | "people" | "deliveries";
+type Tab =
+  | "stock"
+  | "catalog"
+  | "needs"
+  | "people"
+  | "deliveries"
+  | "kits"
+  | "mail"
+  | "social"
+  | "users";
 
 export function AdminPage({ onBack }: Props) {
   const [user, setUser] = useState<string | null>(null);
@@ -38,6 +50,7 @@ export function AdminPage({ onBack }: Props) {
 
   const [foods, setFoods] = useState<Food[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [kits, setKits] = useState<Kit[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [personNeeds, setPersonNeeds] = useState<PersonNeed[]>([]);
   const [communityNeeds, setCommunityNeeds] = useState<CommunityNeed[]>([]);
@@ -63,6 +76,12 @@ export function AdminPage({ onBack }: Props) {
     setCommunityNeeds(cn.needs);
     setDeliveries(d.deliveries);
     setBasketItems(b.items);
+    try {
+      const k = await listAdminKits();
+      setKits(k.kits ?? []);
+    } catch {
+      setKits([]);
+    }
   }, []);
 
   useEffect(() => {
@@ -140,9 +159,13 @@ export function AdminPage({ onBack }: Props) {
               [
                 ["people", t("admin.tab_people")],
                 ["deliveries", t("admin.tab_deliveries")],
+                ["kits", t("admin.tab_kits")],
                 ["needs", t("admin.tab_needs")],
                 ["catalog", t("admin.tab_catalog")],
                 ["stock", t("admin.tab_stock")],
+                ["mail", t("admin.tab_mail")],
+                ["social", t("admin.tab_social")],
+                ["users", t("admin.tab_users")],
               ] as Array<[Tab, string]>
             ).map(([id, label]) => (
               <button
@@ -178,11 +201,16 @@ export function AdminPage({ onBack }: Props) {
                 people={people}
                 foods={foods}
                 basketItems={basketItems}
+                kits={kits}
                 deliveries={deliveries}
                 onRefresh={() => void refresh().then(() => setMessage(t("admin.saved")))}
                 onError={setError}
               />
             )}
+            {tab === "kits" && <KitsPanel foods={foods} />}
+            {tab === "mail" && <MailPanel />}
+            {tab === "social" && <SocialAdminPanel />}
+            {tab === "users" && <UsersPanel />}
             {tab === "needs" && (
               <NeedsPanel
                 foods={foods}

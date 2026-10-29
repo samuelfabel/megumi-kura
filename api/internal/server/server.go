@@ -17,27 +17,39 @@ import (
 	"github.com/samuelfabel/megumi-kura/api/internal/config"
 	"github.com/samuelfabel/megumi-kura/api/internal/delivery"
 	"github.com/samuelfabel/megumi-kura/api/internal/food"
+	"github.com/samuelfabel/megumi-kura/api/internal/kit"
+	"github.com/samuelfabel/megumi-kura/api/internal/mail"
+	"github.com/samuelfabel/megumi-kura/api/internal/media"
 	"github.com/samuelfabel/megumi-kura/api/internal/need"
 	"github.com/samuelfabel/megumi-kura/api/internal/person"
+	"github.com/samuelfabel/megumi-kura/api/internal/projection"
 	"github.com/samuelfabel/megumi-kura/api/internal/promise"
 	"github.com/samuelfabel/megumi-kura/api/internal/quantity"
 	"github.com/samuelfabel/megumi-kura/api/internal/settings"
+	"github.com/samuelfabel/megumi-kura/api/internal/social"
 	"github.com/samuelfabel/megumi-kura/api/internal/stock"
+	"github.com/samuelfabel/megumi-kura/api/internal/user"
 )
 
 type API struct {
-	Cfg        config.Config
-	Auth       *auth.Service
-	Captcha    *captcha.Service
-	Foods      *food.Repository
-	Stock      *stock.Repository
-	Promises   *promise.Repository
-	Basket     *basket.Repository
-	Settings   *settings.Repository
-	Categories *category.Repository
-	Needs      *need.Repository
-	People     *person.Repository
-	Deliveries *delivery.Repository
+	Cfg         config.Config
+	Auth        *auth.Service
+	Captcha     *captcha.Service
+	Foods       *food.Repository
+	Stock       *stock.Repository
+	Promises    *promise.Repository
+	Basket      *basket.Repository
+	Kits        *kit.Repository
+	Media       *media.Repository
+	Mail        *mail.Repository
+	Social      *social.Repository
+	Projections *projection.Repository
+	Users       *user.Repository
+	Settings    *settings.Repository
+	Categories  *category.Repository
+	Needs       *need.Repository
+	People      *person.Repository
+	Deliveries  *delivery.Repository
 }
 
 func (a *API) Router() *gin.Engine {
@@ -53,9 +65,20 @@ func (a *API) Router() *gin.Engine {
 			pub.GET("/stock", a.getPublicStock)
 			pub.GET("/promises", a.getPublicPromises)
 			pub.POST("/promises", a.createPublicPromise)
+			pub.POST("/promise-batches", a.createPublicPromiseBatch)
 			pub.GET("/captcha", a.getPublicCaptcha)
 			pub.GET("/settings", a.getPublicSettings)
 			pub.GET("/needs", a.getPublicNeeds)
+			pub.GET("/kits", a.listPublicKits)
+			pub.GET("/media/:id", a.getPublicMedia)
+			pub.GET("/projections", a.getProjectionSeries)
+			pub.GET("/shortage-risks", a.getShortageRisks)
+			pub.POST("/mail/subscribe", a.subscribeMail)
+			pub.POST("/mail/unsubscribe", a.unsubscribeMail)
+			pub.GET("/mail/unsubscribe", a.unsubscribeMail)
+			pub.GET("/social/posts", a.listSocialPublic)
+			pub.GET("/social/posts/:id", a.getSocialPublic)
+			pub.POST("/social/posts/:id/comments", a.commentSocialPublic)
 		}
 
 		authGroup := v1.Group("/auth")
@@ -63,12 +86,15 @@ func (a *API) Router() *gin.Engine {
 			authGroup.POST("/login", a.postLogin)
 			authGroup.POST("/logout", a.postLogout)
 			authGroup.GET("/me", a.Auth.Middleware(), a.getMe)
+			authGroup.POST("/password-reset/request", a.requestPasswordReset)
+			authGroup.POST("/password-reset/confirm", a.resetPassword)
 		}
 
 		admin := v1.Group("/admin", a.Auth.Middleware())
 		{
 			admin.GET("/foods", a.listFoods)
 			admin.POST("/foods", a.createFood)
+			admin.PUT("/foods/:id/icon", a.requirePerm("stock"), a.setFoodIcon)
 			admin.POST("/stock/in", a.stockIn)
 			admin.POST("/stock/out", a.stockOut)
 			admin.GET("/stock/movements", a.listMovements)
@@ -95,6 +121,31 @@ func (a *API) Router() *gin.Engine {
 
 			admin.GET("/deliveries", a.listDeliveries)
 			admin.POST("/deliveries", a.createDelivery)
+
+			admin.POST("/media", a.requirePerm("kits"), a.postAdminMedia)
+			admin.GET("/kits", a.requirePerm("kits"), a.listAdminKits)
+			admin.POST("/kits", a.requirePerm("kits"), a.createKit)
+			admin.PUT("/kits/:id", a.requirePerm("kits"), a.updateKit)
+			admin.PUT("/kits/:id/items", a.requirePerm("kits"), a.putKitItems)
+
+			admin.GET("/mail/templates", a.requirePerm("email"), a.listMailTemplates)
+			admin.PUT("/mail/templates/:key", a.requirePerm("email"), a.updateMailTemplate)
+			admin.GET("/mail/settings", a.requirePerm("email"), a.getMailSettings)
+			admin.PUT("/mail/settings", a.requirePerm("email"), a.putMailSettings)
+			admin.POST("/mail/send-shortage", a.requirePerm("email"), a.sendShortageMail)
+			admin.PUT("/foods/:id/alert-threshold", a.requirePerm("email"), a.putFoodThreshold)
+
+			admin.GET("/social/posts", a.requirePerm("social"), a.listSocialAdmin)
+			admin.POST("/social/posts", a.requirePerm("social"), a.createSocialAdmin)
+			admin.PUT("/social/posts/:id", a.requirePerm("social"), a.updateSocialAdmin)
+			admin.POST("/social/comments/:id/moderate", a.requirePerm("social"), a.moderateComment)
+
+			admin.GET("/users", a.requirePerm("users"), a.listUsers)
+			admin.POST("/users", a.requirePerm("users"), a.createUser)
+			admin.PUT("/users/:id", a.requirePerm("users"), a.putUserPermissions)
+
+			admin.GET("/projections", a.getProjectionSeries)
+			admin.GET("/shortage-risks", a.getShortageRisks)
 		}
 	}
 
@@ -159,6 +210,9 @@ func (a *API) getPublicSummary(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to load promises"})
 		return
 	}
+	if promisesToday == nil {
+		promisesToday = []promise.Aggregate{}
+	}
 	// Needs use stock + valid (non-expired) promises.
 	validPromises, err := a.Promises.ValidAggregatesFromToday(ctx, today)
 	if err != nil {
@@ -212,6 +266,14 @@ func (a *API) getPublicSummary(c *gin.Context) {
 
 	site, _ := a.Settings.Public(ctx)
 	communityNeeds, _ := a.Needs.List(ctx, true)
+	var kits any
+	var risks any
+	if a.Kits != nil {
+		kits, _ = a.Kits.List(ctx, true)
+	}
+	if a.Projections != nil {
+		risks, _ = a.Projections.ShortageRisks(ctx)
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"site":              site,
 		"stock":             stockBalances,
@@ -220,6 +282,8 @@ func (a *API) getPublicSummary(c *gin.Context) {
 		"promises_today":    promisesToday,
 		"needs":             needs,
 		"community_needs":   communityNeeds,
+		"kits":              kits,
+		"shortage_risks":    risks,
 		"as_of":             today.Format("2006-01-02"),
 	})
 }
@@ -290,12 +354,14 @@ func (a *API) createPublicPromise(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "captcha unavailable"})
 		return
 	}
-	if err := a.Captcha.Verify(body.CaptchaToken, body.CaptchaAnswer); err != nil {
+	if err := a.Captcha.Verify(c.Request.Context(), body.CaptchaToken, body.CaptchaAnswer, c.ClientIP()); err != nil {
 		switch {
 		case errors.Is(err, captcha.ErrExpired):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "captcha expired"})
 		case errors.Is(err, captcha.ErrUsed):
 			c.JSON(http.StatusBadRequest, gin.H{"error": "captcha already used"})
+		case errors.Is(err, captcha.ErrMisconfigured):
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "captcha unavailable"})
 		default:
 			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid captcha"})
 		}

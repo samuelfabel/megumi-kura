@@ -207,6 +207,23 @@ FROM (VALUES
 JOIN people p ON p.full_name = v.person
 JOIN foods f ON f.code = v.code;
 
+-- Extra kit example (elderly / mobility)
+INSERT INTO kits (code, name, description, sort_order)
+VALUES ('kit_idosos', 'Kit idosos / mobilidade', 'Fraldas, panos e cuidados', 2)
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO kit_items (kit_id, food_id, quantity)
+SELECT k.id, f.id, v.qty::numeric
+FROM kits k
+CROSS JOIN (VALUES
+    ('sabonete', '4'),
+    ('shampoo', '2'),
+    ('papel_hig', '4')
+) AS v(code, qty)
+JOIN foods f ON f.code = v.code
+WHERE k.code = 'kit_idosos'
+ON CONFLICT (kit_id, food_id) DO UPDATE SET quantity = EXCLUDED.quantity;
+
 -- Sample delivery: Helena received a basket with these products
 WITH d AS (
     INSERT INTO deliveries (person_id, delivered_on, note, deduct_stock, created_by)

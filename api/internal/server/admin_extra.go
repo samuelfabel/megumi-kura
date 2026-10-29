@@ -219,6 +219,18 @@ func (a *API) createDelivery(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body"})
 		return
 	}
+	if in.KitID != nil && *in.KitID > 0 {
+		expanded, err := a.Kits.ExpandItems(c.Request.Context(), *in.KitID)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		kitItems := make([]delivery.Item, 0, len(expanded))
+		for _, it := range expanded {
+			kitItems = append(kitItems, delivery.Item{FoodID: it.FoodID, Quantity: it.Quantity})
+		}
+		in.Items = append(kitItems, in.Items...)
+	}
 	u, _ := auth.CurrentUser(c)
 	uid := u.ID
 	item, err := a.Deliveries.Create(c.Request.Context(), in, &uid)

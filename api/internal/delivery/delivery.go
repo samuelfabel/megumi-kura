@@ -25,6 +25,7 @@ type Delivery struct {
 	ID          int64     `json:"id"`
 	PersonID    int64     `json:"person_id"`
 	PersonName  string    `json:"person_name,omitempty"`
+	KitID       *int64    `json:"kit_id,omitempty"`
 	DeliveredOn string    `json:"delivered_on"`
 	Note        string    `json:"note"`
 	DeductStock bool      `json:"deduct_stock"`
@@ -35,6 +36,7 @@ type Delivery struct {
 
 type CreateInput struct {
 	PersonID    int64  `json:"person_id"`
+	KitID       *int64 `json:"kit_id"`
 	DeliveredOn string `json:"delivered_on"`
 	Note        string `json:"note"`
 	DeductStock *bool  `json:"deduct_stock"`
@@ -51,7 +53,7 @@ func (r *Repository) List(ctx context.Context, limit int) ([]Delivery, error) {
 		limit = 50
 	}
 	rows, err := r.DB.QueryContext(ctx, `
-		SELECT d.id, d.person_id, p.full_name, to_char(d.delivered_on, 'YYYY-MM-DD'),
+		SELECT d.id, d.person_id, p.full_name, d.kit_id, to_char(d.delivered_on, 'YYYY-MM-DD'),
 		       d.note, d.deduct_stock, d.created_by, d.created_at
 		FROM deliveries d
 		JOIN people p ON p.id = d.person_id
@@ -65,8 +67,12 @@ func (r *Repository) List(ctx context.Context, limit int) ([]Delivery, error) {
 	var out []Delivery
 	for rows.Next() {
 		var d Delivery
-		if err := rows.Scan(&d.ID, &d.PersonID, &d.PersonName, &d.DeliveredOn, &d.Note, &d.DeductStock, &d.CreatedBy, &d.CreatedAt); err != nil {
+		var kit sql.NullInt64
+		if err := rows.Scan(&d.ID, &d.PersonID, &d.PersonName, &kit, &d.DeliveredOn, &d.Note, &d.DeductStock, &d.CreatedBy, &d.CreatedAt); err != nil {
 			return nil, err
+		}
+		if kit.Valid {
+			d.KitID = &kit.Int64
 		}
 		items, err := r.itemsFor(ctx, nil, d.ID)
 		if err != nil {
@@ -152,14 +158,18 @@ func (r *Repository) Create(ctx context.Context, in CreateInput, userID *int64) 
 	}
 
 	var d Delivery
+	var kit sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
-		INSERT INTO deliveries(person_id, delivered_on, note, deduct_stock, created_by)
-		VALUES ($1, $2::date, $3, $4, $5)
-		RETURNING id, person_id, to_char(delivered_on, 'YYYY-MM-DD'), note, deduct_stock, created_by, created_at`,
-		in.PersonID, in.DeliveredOn, strings.TrimSpace(in.Note), deduct, userID,
-	).Scan(&d.ID, &d.PersonID, &d.DeliveredOn, &d.Note, &d.DeductStock, &d.CreatedBy, &d.CreatedAt)
+		INSERT INTO deliveries(person_id, kit_id, delivered_on, note, deduct_stock, created_by)
+		VALUES ($1, $2, $3::date, $4, $5, $6)
+		RETURNING id, person_id, kit_id, to_char(delivered_on, 'YYYY-MM-DD'), note, deduct_stock, created_by, created_at`,
+		in.PersonID, in.KitID, in.DeliveredOn, strings.TrimSpace(in.Note), deduct, userID,
+	).Scan(&d.ID, &d.PersonID, &kit, &d.DeliveredOn, &d.Note, &d.DeductStock, &d.CreatedBy, &d.CreatedAt)
 	if err != nil {
 		return Delivery{}, err
+	}
+	if kit.Valid {
+		d.KitID = &kit.Int64
 	}
 	d.PersonName = personName
 

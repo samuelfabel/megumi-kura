@@ -1,41 +1,53 @@
 # Captcha on public promises
 
-Public promise creation requires a **self-hosted arithmetic captcha**
-(no third-party provider).
+Public promise creation requires captcha. The provider is **configurable** via
+environment variables.
 
-## Flow
+## Providers
 
-1. Client calls `GET /api/v1/public/captcha`
-2. API returns `{ captcha_token, question }` (e.g. `"7 + 4"`)
-3. Donor solves it and posts `POST /api/v1/public/promises` with:
-   - promise fields (`food_id`, `person_name`, `quantity`, `promise_date`)
-   - `captcha_token` and `captcha_answer`
-4. Server checks HMAC signature, expiry, answer, and one-time use
+| `MK_CAPTCHA_PROVIDER` | Description |
+| --- | --- |
+| `math` (default) | Self-hosted arithmetic challenge (fine for local development) |
+| `google` | Google reCAPTCHA v2 (“I’m not a robot”) |
+| `cloudflare` | Cloudflare Turnstile |
 
-Admin-created promises (`POST /api/v1/admin/promises`) do **not** require
-captcha (already authenticated).
-
-## Token format
-
-Same pattern as the session cookie (HMAC-SHA256 with `MK_SESSION_SECRET`):
-
-```text
-payload = "{expUnixMilli}|{a}|{b}|{nonce}"
-token   = base64url(payload) + "." + base64url(HMAC-SHA256(payload))
-```
-
-Correct answer is `a + b`. Used or expired tokens are rejected.
-
-## Offline
-
-While offline, a promise may be queued on the device **without** captcha.
-When back online, the user solves a fresh captcha and flushes the queue
-(one item per challenge). There is no silent auto-flush because every public
-`POST` requires captcha.
+Use `google` or `cloudflare` in production. The `math` mode is easy to automate.
 
 ## Configuration
 
-| Variable | Purpose |
-| --- | --- |
-| `MK_SESSION_SECRET` | HMAC key for captcha tokens (same as session) |
-| `MK_CAPTCHA_TTL_SECONDS` | challenge lifetime (default 600) |
+```bash
+# Google reCAPTCHA v2
+MK_CAPTCHA_PROVIDER=google
+MK_CAPTCHA_SITE_KEY=your_site_key
+MK_CAPTCHA_SECRET_KEY=your_secret_key
+
+# Cloudflare Turnstile
+MK_CAPTCHA_PROVIDER=cloudflare
+MK_CAPTCHA_SITE_KEY=your_site_key
+MK_CAPTCHA_SECRET_KEY=your_secret_key
+
+# Local dev (default)
+MK_CAPTCHA_PROVIDER=math
+# MK_CAPTCHA_TTL_SECONDS=600
+```
+
+- `MK_CAPTCHA_SITE_KEY` — public key (browser)
+- `MK_CAPTCHA_SECRET_KEY` — server secret (`math` falls back to `MK_SESSION_SECRET`)
+
+## Flow
+
+1. `GET /api/v1/public/captcha` returns the active provider challenge
+2. The public form renders the matching widget
+3. `POST /api/v1/public/promises` (or `/promise-batches`) sends `captcha_token`
+   (`captcha_answer` only for `math`)
+4. Server verifies via HMAC (`math`) or the provider’s siteverify API
+
+`GET /api/v1/public/settings` also exposes `captcha_provider` and `captcha_site_key`
+(never the secret).
+
+Admin promises do **not** require captcha.
+
+## Offline
+
+While offline, a promise may be queued **without** captcha. When back online,
+the user solves the widget/challenge and flushes the queue (one item per check).
