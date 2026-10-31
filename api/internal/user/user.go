@@ -189,7 +189,8 @@ func (r *Repository) ReplacePermissions(ctx context.Context, userID int64, perms
 			continue
 		}
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO user_permissions(user_id, permission) VALUES ($1, $2)`, userID, p); err != nil {
+			INSERT INTO user_permissions(user_id, permission) VALUES ($1, $2)
+			ON CONFLICT DO NOTHING`, userID, p); err != nil {
 			return err
 		}
 	}
