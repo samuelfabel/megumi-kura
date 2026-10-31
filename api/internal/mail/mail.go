@@ -15,6 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/lib/pq"
+
 	"github.com/samuelfabel/megumi-kura/api/internal/quantity"
 )
 
@@ -67,7 +69,7 @@ func (r *Repository) ListTemplates(ctx context.Context) ([]Template, error) {
 	var out []Template
 	for rows.Next() {
 		var t Template
-		if err := rows.Scan(&t.Key, &t.Name, &t.Subject, &t.BodyHTML, &t.RequiredTags, &t.OptionalTags); err != nil {
+		if err := rows.Scan(&t.Key, &t.Name, &t.Subject, &t.BodyHTML, pq.Array(&t.RequiredTags), pq.Array(&t.OptionalTags)); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -80,7 +82,7 @@ func (r *Repository) GetTemplate(ctx context.Context, key string) (Template, err
 	err := r.DB.QueryRowContext(ctx, `
 		SELECT key, name, subject, body_html, required_tags, optional_tags
 		FROM email_templates WHERE key = $1`, key,
-	).Scan(&t.Key, &t.Name, &t.Subject, &t.BodyHTML, &t.RequiredTags, &t.OptionalTags)
+	).Scan(&t.Key, &t.Name, &t.Subject, &t.BodyHTML, pq.Array(&t.RequiredTags), pq.Array(&t.OptionalTags))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Template{}, ErrNotFound
 	}
