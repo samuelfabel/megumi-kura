@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { t } from "../i18n";
 import { subscribeMail } from "../services/api";
 
@@ -25,7 +25,7 @@ export function MailSubscribe() {
   }
 
   return (
-    <section className="section reveal" style={{ animationDelay: "360ms" }}>
+    <section className="section mail-subscribe reveal" style={{ animationDelay: "240ms" }}>
       <h2>{t("mail.title")}</h2>
       <p className="section-lead">{t("mail.lead")}</p>
       <form className="promise-form" onSubmit={(e) => void onSubmit(e)}>
@@ -45,19 +45,6 @@ export function MailSubscribe() {
         {ok && <p className="ok-text">{t("mail.success")}</p>}
         {error && <p className="error-text">{error}</p>}
       </form>
-    </section>
-  );
-}
-
-export function SocialTeaser({ onOpen }: { onOpen: () => void }) {
-  useEffect(() => {}, []);
-  return (
-    <section className="section reveal" style={{ animationDelay: "400ms" }}>
-      <h2>{t("social.title")}</h2>
-      <p className="section-lead">{t("social.lead")}</p>
-      <button type="button" className="btn-secondary" onClick={onOpen}>
-        {t("social.open")}
-      </button>
     </section>
   );
 }
