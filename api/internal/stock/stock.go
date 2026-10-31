@@ -15,15 +15,15 @@ var (
 )
 
 type Movement struct {
-	ID           int64       `json:"id"`
-	FoodID       int64       `json:"food_id"`
-	FoodName     string      `json:"food_name,omitempty"`
-	FoodUnit     string      `json:"food_unit,omitempty"`
-	MovementType string      `json:"movement_type"`
-	Quantity     quantity.Q  `json:"quantity"`
-	Note         *string     `json:"note,omitempty"`
-	CreatedBy    *int64      `json:"created_by,omitempty"`
-	CreatedAt    time.Time   `json:"created_at"`
+	ID           int64      `json:"id"`
+	FoodID       int64      `json:"food_id"`
+	FoodName     string     `json:"food_name,omitempty"`
+	FoodUnit     string     `json:"food_unit,omitempty"`
+	MovementType string     `json:"movement_type"`
+	Quantity     quantity.Q `json:"quantity"`
+	Note         *string    `json:"note,omitempty"`
+	CreatedBy    *int64     `json:"created_by,omitempty"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 type Balance struct {

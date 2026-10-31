@@ -17,24 +17,24 @@ type Point struct {
 }
 
 type Series struct {
-	FoodID   int64   `json:"food_id"`
-	Code     string  `json:"code"`
-	Name     string  `json:"name"`
-	Unit     string  `json:"unit"`
-	Points   []Point `json:"points"`
+	FoodID int64   `json:"food_id"`
+	Code   string  `json:"code"`
+	Name   string  `json:"name"`
+	Unit   string  `json:"unit"`
+	Points []Point `json:"points"`
 }
 
 type ShortageRisk struct {
-	FoodID       int64      `json:"food_id"`
-	Code         string     `json:"code"`
-	Name         string     `json:"name"`
-	Unit         string     `json:"unit"`
-	Stock        quantity.Q `json:"stock"`
-	Promised     quantity.Q `json:"promised"`
+	FoodID        int64      `json:"food_id"`
+	Code          string     `json:"code"`
+	Name          string     `json:"name"`
+	Unit          string     `json:"unit"`
+	Stock         quantity.Q `json:"stock"`
+	Promised      quantity.Q `json:"promised"`
 	ProjectedNeed quantity.Q `json:"projected_need"`
-	DaysToEmpty  *int       `json:"days_to_empty,omitempty"`
-	Alert        bool       `json:"alert"`
-	Severity     string     `json:"severity"` // ok|watch|critical
+	DaysToEmpty   *int       `json:"days_to_empty,omitempty"`
+	Alert         bool       `json:"alert"`
+	Severity      string     `json:"severity"` // ok|watch|critical
 }
 
 type Repository struct {

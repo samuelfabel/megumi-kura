@@ -184,16 +184,16 @@ func (a *API) mountStatic(r *gin.Engine) {
 }
 
 type needProgress struct {
-	FoodID      int64      `json:"food_id"`
-	Code        string     `json:"code"`
-	Name        string     `json:"name"`
-	Unit        string     `json:"unit"`
-	Needed      quantity.Q `json:"needed"`
-	Stock       quantity.Q `json:"stock"`
-	Promised    quantity.Q `json:"promised"`
-	Total       quantity.Q `json:"total"`
-	Missing     quantity.Q `json:"missing"`
-	Percent     int        `json:"percent"`
+	FoodID   int64      `json:"food_id"`
+	Code     string     `json:"code"`
+	Name     string     `json:"name"`
+	Unit     string     `json:"unit"`
+	Needed   quantity.Q `json:"needed"`
+	Stock    quantity.Q `json:"stock"`
+	Promised quantity.Q `json:"promised"`
+	Total    quantity.Q `json:"total"`
+	Missing  quantity.Q `json:"missing"`
+	Percent  int        `json:"percent"`
 }
 
 func (a *API) getPublicSummary(c *gin.Context) {

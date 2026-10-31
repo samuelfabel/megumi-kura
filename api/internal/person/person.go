@@ -13,14 +13,14 @@ import (
 var ErrNotFound = errors.New("person not found")
 
 type Person struct {
-	ID               int64     `json:"id"`
-	FullName         string    `json:"full_name"`
-	Notes            string    `json:"notes"`
-	Active           bool      `json:"active"`
-	PickupFrequency  *string   `json:"pickup_frequency,omitempty"`
-	LastDeliveredOn  *string   `json:"last_delivered_on,omitempty"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	ID              int64     `json:"id"`
+	FullName        string    `json:"full_name"`
+	Notes           string    `json:"notes"`
+	Active          bool      `json:"active"`
+	PickupFrequency *string   `json:"pickup_frequency,omitempty"`
+	LastDeliveredOn *string   `json:"last_delivered_on,omitempty"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 }
 
 type Need struct {

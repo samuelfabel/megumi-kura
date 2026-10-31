@@ -8,14 +8,14 @@ import (
 )
 
 type PublicSettings struct {
-	Name           string `json:"name"`
-	Description    string `json:"description"`
-	Logo           string `json:"logo"`
-	Favicon        string `json:"favicon"`
-	PrimaryColor   string `json:"primary_color"`
-	SecondaryColor string `json:"secondary_color"`
-	AccentColor    string `json:"accent_color"`
-	DefaultLocale  string `json:"default_locale"`
+	Name            string `json:"name"`
+	Description     string `json:"description"`
+	Logo            string `json:"logo"`
+	Favicon         string `json:"favicon"`
+	PrimaryColor    string `json:"primary_color"`
+	SecondaryColor  string `json:"secondary_color"`
+	AccentColor     string `json:"accent_color"`
+	DefaultLocale   string `json:"default_locale"`
 	CaptchaProvider string `json:"captcha_provider"`
 	CaptchaSiteKey  string `json:"captcha_site_key,omitempty"`
 }

@@ -24,19 +24,19 @@ type Item struct {
 }
 
 type Kit struct {
-	ID            int64     `json:"id"`
-	Code          string    `json:"code"`
-	Name          string    `json:"name"`
-	Description   string    `json:"description"`
-	IconMediaID   *int64    `json:"icon_media_id,omitempty"`
-	SortOrder     int       `json:"sort_order"`
-	Active        bool      `json:"active"`
-	Items         []Item    `json:"items,omitempty"`
-	Available     int64     `json:"available,omitempty"`
-	LimitingCode  string    `json:"limiting_food_code,omitempty"`
-	LimitingName  string    `json:"limiting_food_name,omitempty"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID           int64     `json:"id"`
+	Code         string    `json:"code"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	IconMediaID  *int64    `json:"icon_media_id,omitempty"`
+	SortOrder    int       `json:"sort_order"`
+	Active       bool      `json:"active"`
+	Items        []Item    `json:"items,omitempty"`
+	Available    int64     `json:"available,omitempty"`
+	LimitingCode string    `json:"limiting_food_code,omitempty"`
+	LimitingName string    `json:"limiting_food_name,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
 type CreateInput struct {

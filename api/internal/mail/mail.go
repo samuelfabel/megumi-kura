@@ -196,10 +196,10 @@ func (r *Repository) ActiveSubscriberCount(ctx context.Context) (int, error) {
 }
 
 type ShortageItem struct {
-	Name     string
-	Unit     string
-	Stock    quantity.Q
-	Missing  quantity.Q
+	Name    string
+	Unit    string
+	Stock   quantity.Q
+	Missing quantity.Q
 }
 
 func (r *Repository) LoadSMTP(ctx context.Context) (SMTPConfig, error) {
@@ -321,9 +321,9 @@ func (r *Repository) ListFoodThresholds(ctx context.Context) (map[int64]quantity
 }
 
 type SendResult struct {
-	Sent           int    `json:"sent"`
-	ShortageCount  int    `json:"shortage_count"`
-	SkippedReason  string `json:"skipped_reason,omitempty"`
+	Sent          int    `json:"sent"`
+	ShortageCount int    `json:"shortage_count"`
+	SkippedReason string `json:"skipped_reason,omitempty"`
 }
 
 // FindShortages returns foods whose stock is at or below threshold (per-food or global).
@@ -432,10 +432,10 @@ func (r *Repository) SendShortageAlert(ctx context.Context, siteName, publicBase
 	for _, rec := range recipients {
 		unsub := strings.TrimRight(publicBaseURL, "/") + "/api/v1/public/mail/unsubscribe?token=" + rec.Token
 		vars := map[string]string{
-			"site_name":        siteName,
-			"shortage_list":    list.String(),
-			"unsubscribe_url":  unsub,
-			"as_of":            time.Now().Format("2006-01-02"),
+			"site_name":       siteName,
+			"shortage_list":   list.String(),
+			"unsubscribe_url": unsub,
+			"as_of":           time.Now().Format("2006-01-02"),
 		}
 		subject := Render(tpl.Subject, vars)
 		body := Render(tpl.BodyHTML, vars)

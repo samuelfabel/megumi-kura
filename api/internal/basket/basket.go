@@ -19,10 +19,10 @@ type Item struct {
 }
 
 type Composition struct {
-	Items             []Item `json:"items"`
-	AvailableBaskets  int64  `json:"available_baskets"`
-	LimitingFoodCode  string `json:"limiting_food_code,omitempty"`
-	LimitingFoodName  string `json:"limiting_food_name,omitempty"`
+	Items            []Item `json:"items"`
+	AvailableBaskets int64  `json:"available_baskets"`
+	LimitingFoodCode string `json:"limiting_food_code,omitempty"`
+	LimitingFoodName string `json:"limiting_food_name,omitempty"`
 }
 
 type PutItem struct {

@@ -26,9 +26,9 @@ const (
 )
 
 var (
-	ErrInvalid    = errors.New("invalid captcha")
-	ErrExpired    = errors.New("captcha expired")
-	ErrUsed       = errors.New("captcha already used")
+	ErrInvalid       = errors.New("invalid captcha")
+	ErrExpired       = errors.New("captcha expired")
+	ErrUsed          = errors.New("captcha already used")
 	ErrMisconfigured = errors.New("captcha provider misconfigured")
 )
 

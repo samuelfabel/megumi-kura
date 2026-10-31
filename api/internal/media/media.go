@@ -10,18 +10,18 @@ import (
 const MaxBytes = 1_048_576 // 1 MiB
 
 var (
-	ErrTooLarge     = errors.New("file exceeds 1MB limit")
-	ErrInvalidType  = errors.New("unsupported content type")
-	ErrNotFound     = errors.New("media not found")
-	ErrEmpty        = errors.New("empty file")
+	ErrTooLarge    = errors.New("file exceeds 1MB limit")
+	ErrInvalidType = errors.New("unsupported content type")
+	ErrNotFound    = errors.New("media not found")
+	ErrEmpty       = errors.New("empty file")
 )
 
 var allowedTypes = map[string]bool{
-	"image/png":  true,
-	"image/jpeg": true,
-	"image/jpg":  true,
-	"image/webp": true,
-	"image/gif":  true,
+	"image/png":     true,
+	"image/jpeg":    true,
+	"image/jpg":     true,
+	"image/webp":    true,
+	"image/gif":     true,
 	"image/svg+xml": true,
 }
 

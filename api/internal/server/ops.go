@@ -294,9 +294,9 @@ func (a *API) getMailSettings(c *gin.Context) {
 	alerts := a.Mail.LoadAlertSettings(c.Request.Context())
 	count, _ := a.Mail.ActiveSubscriberCount(c.Request.Context())
 	c.JSON(http.StatusOK, gin.H{
-		"smtp":               cfg,
-		"alerts":             alerts,
-		"subscriber_count":   count,
+		"smtp":             cfg,
+		"alerts":           alerts,
+		"subscriber_count": count,
 		// emails themselves are NEVER listed
 	})
 }
