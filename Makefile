@@ -1,4 +1,4 @@
-.PHONY: dev test build db-migrate db-seed web-build web-install clean
+.PHONY: dev test build db-migrate db-seed web-build web-test web-install clean
 
 ROOT := $(abspath .)
 API_DIR := $(ROOT)/api
@@ -32,6 +32,9 @@ web-install:
 
 web-build: web-install
 	cd $(WEB_DIR) && npm run build
+
+web-test: web-install
+	cd $(WEB_DIR) && npm test
 
 clean:
 	rm -rf $(BIN_DIR) $(WEB_DIR)/dist $(WEB_DIR)/node_modules

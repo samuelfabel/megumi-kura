@@ -35,8 +35,18 @@ Change this password before any non-local use.
 ## Tests
 
 ```bash
-make test
+make test        # Go unit tests; integration tests are skipped
+make web-test    # frontend tests (Vitest)
 ```
+
+Integration tests run against a dedicated PostgreSQL database. Each test creates
+its own schema, applies the migrations and drops it afterwards:
+
+```bash
+MK_TEST_DATABASE_URL="postgres://megumi:megumi@localhost:5432/megumi_test?sslmode=disable" make test
+```
+
+CI runs both suites, `go vet`, `gofmt` and the frontend build on every pull request.
 
 ## Git branches
 
